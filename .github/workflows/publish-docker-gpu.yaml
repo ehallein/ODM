@@ -3,7 +3,7 @@ name: Publish Docker GPU Images
 on:
   push:
     branches:
-    - master
+    - custom-actions
     tags:
     - v*
 
@@ -31,7 +31,7 @@ jobs:
         platforms: linux/amd64
         push: true
         no-cache: true
-        tags: opendronemap/odm:gpu
+        tags: saduma/odm:gpu
     # Trigger NodeODM build
     - name: Dispatch NodeODM Build Event
       id: nodeodm_dispatch
