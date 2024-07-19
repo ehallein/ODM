@@ -3,13 +3,13 @@ name: Publish Docker and WSL Images
 on:
   push:
     branches:
-    - master
+    - custom-actions
     tags:
     - v*
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 2880
     steps:
     - name: Checkout
@@ -32,7 +32,7 @@ jobs:
       id: docker_meta
       uses: crazy-max/ghaction-docker-meta@v1
       with:
-        images: opendronemap/odm
+        images: saduma/odm
         tag-semver: |
           {{version}}
     - name: Build and push Docker image
@@ -45,7 +45,7 @@ jobs:
         no-cache: true
         tags: |
           ${{ steps.docker_meta.outputs.tags }}
-          opendronemap/odm:latest
+          saduma/odm:latest
     # Trigger NodeODM build
     - name: Dispatch NodeODM Build Event
       id: nodeodm_dispatch
