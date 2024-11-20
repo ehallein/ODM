@@ -1,21 +1,17 @@
 import os
 import shutil
-import json
-import yaml
 from opendm import log
 from opendm.osfm import OSFMContext, get_submodel_argv, get_submodel_paths, get_all_submodel_paths
 from opendm import types
 from opendm import io
 from opendm import system
 from opendm import orthophoto
-from opendm.gcp import GCPFile
-from opendm.dem import pdal, utils
+from opendm.dem import utils
 from opendm.dem.merge import euclidean_merge_dems
 from opensfm.large import metadataset
 from opendm.cropper import Cropper
-from opendm.concurrency import get_max_memory
 from opendm.remote import LocalRemoteExecutor
-from opendm.shots import merge_geojson_shots
+from opendm.shots import merge_geojson_shots, merge_cameras
 from opendm import point_cloud
 from opendm.utils import double_quote
 from opendm.tiles.tiler import generate_dem_tiles
@@ -29,14 +25,15 @@ class ODMSplitStage(types.ODM_Stage):
         photos = reconstruction.photos
         outputs['large'] = False
 
-        should_split = len(photos) > args.split
+        image_groups_file = os.path.join(args.project_path, "image_groups.txt")
+        if 'split_image_groups_is_set' in args:
+            image_groups_file = os.path.abspath(args.split_image_groups)
 
-        if should_split:
-            # check for availability of either image_groups.txt (split-merge) or geotagged photos
-            image_groups_file = os.path.join(args.project_path, "image_groups.txt")
-            if 'split_image_groups_is_set' in args:
-                image_groups_file = os.path.abspath(args.split_image_groups)
-            if io.file_exists(image_groups_file) or reconstruction.has_geotagged_photos():
+        if io.file_exists(image_groups_file):
+            outputs['large'] = True
+        elif len(photos) > args.split:
+            # check for availability of geotagged photos
+            if reconstruction.has_geotagged_photos():
                 outputs['large'] = True
             else:
                 log.ODM_WARNING('Could not perform split-merge as GPS information in photos or image_groups.txt is missing.')
@@ -335,6 +332,15 @@ class ODMMergeStage(types.ODM_Stage):
                 merge_geojson_shots(geojson_shots_files, geojson_shots)
             else:
                 log.ODM_WARNING("Found merged shots.geojson in %s" % tree.odm_report)
+
+            # Merge cameras
+            cameras_json = tree.path("cameras.json")
+            if not io.file_exists(cameras_json) or self.rerun():
+                cameras_json_files = get_submodel_paths(tree.submodels_path, "cameras.json")
+                log.ODM_INFO("Merging %s cameras.json files" % len(cameras_json_files))
+                merge_cameras(cameras_json_files, cameras_json)
+            else:
+                log.ODM_WARNING("Found merged cameras.json in %s" % tree.root_path)
 
             # Stop the pipeline short by skipping to the postprocess stage.
             # Afterwards, we're done.
